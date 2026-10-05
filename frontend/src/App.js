@@ -6,7 +6,10 @@ import FillFormPage from "./pages/FillFormPage";
 import FormResponsesPage from "./pages/FormResponsesPage";
 import DashboardPage from "./pages/DashboardPage";
 import RegisterPage from "./pages/RegisterPage";
+import { useEffect } from "react";
+import { setupAuthInterceptor } from "./utils/auth";
 
+setupAuthInterceptor();
 
 function PrivateRoute({ children }) {
   const token = localStorage.getItem("token");

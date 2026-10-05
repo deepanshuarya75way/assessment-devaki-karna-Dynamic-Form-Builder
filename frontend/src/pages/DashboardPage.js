@@ -40,11 +40,18 @@ export default function DashboardPage() {
   const URL = process.env.REACT_APP_URL || "http://localhost:5000";
 
   // Logout handler
-  const handleLogout = () => {
+  const handleLogout = async() => {
+    try {
+      await axios.post(`${URL}/api/users/logout`);
+
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
     localStorage.removeItem("token");
     setUser(null);
     navigate("/login");
     setMobileMenuOpen(false);
+    }
   };
 
   const openDeleteModal = (formId, formTitle) => {
