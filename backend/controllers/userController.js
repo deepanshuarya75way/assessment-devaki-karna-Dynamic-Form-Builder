@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 //task1
 const generateAccessToken = (id) => {
@@ -8,7 +9,7 @@ const generateAccessToken = (id) => {
     { id }
   ,
   process.env.JWT_SECRET, {
-    expiresIn: '30s'
+    expiresIn: '1m'
   }
 );
 };
@@ -72,6 +73,7 @@ const registerUser = async (req, res) => {
     });
 
     if (user) {
+      await issueRefreshToken(user, res);
       res.status(201).json({
         _id: user._id,
         name: user.name,
@@ -107,7 +109,7 @@ const loginUser = async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
-
+    await issueRefreshToken(user, res);
     res.json({
       _id: user._id,
       name: user.name,
@@ -128,7 +130,7 @@ const logoutUser = async (req, res) => {
     const refreshToken = req.cookies.refreshToken;
 
     if (refreshToken) {
-      const hashToken = hashRefreshToken(refreshToken);
+      const hashedToken = hashRefreshToken(refreshToken);
       await User.findOneAndUpdate(
         {refreshTokenHash: hashedToken}, {
           $set: {
@@ -139,7 +141,7 @@ const logoutUser = async (req, res) => {
       );
     }
 
-    res.clearCookie('refrewshToken', {
+    res.clearCookie('refreshToken', {
       httpOnly: true, 
       secure: process.env.NODE_ENV === 'production', 
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' });
@@ -199,7 +201,7 @@ const updateUserProfile = async (req, res) => {
         name: updatedUser.name,
         email: updatedUser.email,
         role: updatedUser.role,
-        token: generateToken(updatedUser._id),
+        token: generateAccessToken(updatedUser._id),
       });
     } else {
       res.status(404).json({ message: 'User not found' });
@@ -224,7 +226,7 @@ const getUsers = async (req, res) => {
 //task1
 const refreshAccessToken = async (req, res) => {
   try {
-    const refreshToken = res.cookies.refreshToken;
+    const refreshToken = req.cookies.refreshToken;
 
     if (!refreshToken) {
       return res.status(401).json({
@@ -234,11 +236,17 @@ const refreshAccessToken = async (req, res) => {
 
     const hashedToken = hashRefreshToken(refreshToken);
     const user = await User.findOne({
-      refreshTokenHash: hasedToken, 
+      refreshTokenHash: hashedToken, 
       refreshTokenExpiresAt: {
         $gt: new Date()
       }
     });
+
+    if (!user){
+      return res.status(401).json({
+        message: "Invalid or expired refresh token",
+      })
+    }
 
     const newAccessToken = generateAccessToken(user._id);
 
